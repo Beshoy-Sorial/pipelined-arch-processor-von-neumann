@@ -77,4 +77,4 @@ Handled using one of the following:
 - Converts `.s` assembly → `.mem` or `.hex`
 - Supports:
   - labels
-  - `.org`, `.word` , '.txt'
+  - `.org`, `.word` , `.txt`
