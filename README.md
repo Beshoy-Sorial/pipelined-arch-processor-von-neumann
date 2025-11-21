@@ -1,4 +1,4 @@
-# pipelined-arch5
+# pipelined-arch-processor
 
 A 5-stage pipelined CPU implemented in VHDL with hazard handling, a compact custom 32-bit ISA, and a Python assembler that converts assembly into machine code for simulation and synthesis. The processor follows a Von Neumann architecture with unified instruction/data memory and includes proper structural hazard handling.
 
