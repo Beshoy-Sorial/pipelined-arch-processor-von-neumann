@@ -1,0 +1,28 @@
+LIBRARY ieee;
+USE ieee.std_logic_1164.ALL;
+USE ieee.numeric_std.ALL;
+entity pipeline_reg is 
+  generic (n:integer :=32);
+  port(clk:in std_logic;
+    enable:in std_logic;
+    data_in: in std_logic_vector(n-1 downto 0);
+    data_out:out std_logic_vector(n-1 downto 0));
+end pipeline_reg;
+
+architecture arch_pipeline_reg of pipeline_reg is 
+signal reg_val : std_logic_vector(n-1 downto 0);
+begin 
+  process(clk)
+  begin
+    if rising_edge(clk)then 
+      if enable ='0' then 
+        reg_val<= data_in;
+      else
+        reg_val <= reg_val;
+
+      end if;
+    end if ;
+  end process;
+  data_out<= reg_val;
+end arch_pipeline_reg;
+
