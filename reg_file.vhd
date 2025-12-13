@@ -2,38 +2,36 @@ LIBRARY ieee;
 USE ieee.std_logic_1164.ALL;
 USE ieee.numeric_std.ALL;
 ENTITY reg_file IS
-  port(
-    clk:in std_logic;
-    write_enable:in std_logic;
-    read_reg_address_1:in std_logic_vector(2 downto 0);
-        read_reg_address_2:in std_logic_vector(2 downto 0);
-        write_reg_address:in std_logic_vector(2 downto 0);
-        write_data :in std_logic_vector(31 downto 0);
-        read_data_1 :out std_logic_vector(31 downto 0);
-        read_data_2 :out std_logic_vector(31 downto 0)
-        );
-end reg_file;
+  PORT (
+    clk : IN STD_LOGIC;
+    write_enable : IN STD_LOGIC;
+    read_reg_address_1 : IN STD_LOGIC_VECTOR(2 DOWNTO 0);
+    read_reg_address_2 : IN STD_LOGIC_VECTOR(2 DOWNTO 0);
+    write_reg_address : IN STD_LOGIC_VECTOR(2 DOWNTO 0);
+    write_data : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
+    read_data_1 : OUT STD_LOGIC_VECTOR(31 DOWNTO 0);
+    read_data_2 : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
+  );
+END reg_file;
 
-architecture arch_reg_file of reg_file is 
-  type type_array is array (0 to 7) of std_logic_vector (31 downto 0);
-  signal register_file : type_array:= (others=>(others=>'0'));
-begin
-  write_process:process(clk)
-  begin 
-    if rising_edge(clk)then 
-      if write_enable = '1' then 
-        register_file(to_integer(unsigned(write_reg_address)))<=write_data;
-      end if;
-    end if ;
-  end process;
-  
-  
-  read_process:process(clk)
-  begin 
-    if falling_edge(clk)then
-      read_data_1<= register_file(to_integer(unsigned(read_reg_address_1)));
-      read_data_2<=register_file(to_integer(unsigned(read_reg_address_2)));
-    end if ;
-  end process;
+ARCHITECTURE arch_reg_file OF reg_file IS
+  TYPE type_array IS ARRAY (0 TO 7) OF STD_LOGIC_VECTOR (31 DOWNTO 0);
+  SIGNAL register_file : type_array := (OTHERS => (OTHERS => '0'));
+BEGIN
+  write_process : PROCESS (clk)
+  BEGIN
+    IF rising_edge(clk) THEN
+      IF write_enable = '1' THEN
+        register_file(to_integer(unsigned(write_reg_address))) <= write_data;
+      END IF;
+    END IF;
+  END PROCESS;
+  read_process : PROCESS (clk)
+  BEGIN
+    IF falling_edge(clk) THEN
+      read_data_1 <= register_file(to_integer(unsigned(read_reg_address_1)));
+      read_data_2 <= register_file(to_integer(unsigned(read_reg_address_2)));
+    END IF;
+  END PROCESS;
 
-end arch_reg_file;
+END arch_reg_file;
