@@ -13,10 +13,10 @@ ENTITY memory IS PORT (
 );
 END ENTITY;
 ARCHITECTURE mem_behave OF memory IS
-        CONSTANT ADDR_WIDTH : INTEGER := 22;
+        CONSTANT ADDR_WIDTH : INTEGER := 10;
         CONSTANT DATA_WIDTH : INTEGER := 31;
         TYPE mem_array IS ARRAY(0 to (2 ** ADDR_WIDTH)) OF STD_LOGIC_VECTOR(DATA_WIDTH DOWNTO 0);
-        SIGNAL main_memory : mem_array := (OTHERS => (OTHERS => '0'));
+        SIGNAL main_memory : mem_array;
 BEGIN
         memo_main : PROCESS (clk, reset)
         BEGIN
