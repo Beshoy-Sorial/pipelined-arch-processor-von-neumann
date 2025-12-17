@@ -68,7 +68,7 @@ ARCHITECTURE cpu_behave OF cpu_top IS
     -- pipeline e/mem
     SIGNAL enable_emem : STD_LOGIC;
     SIGNAL data_in_emem : STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
-    SIGNAL data_out_emem : STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
+    SIGNAL data_out_emem c: STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
     -- pipeline mem/wb
     SIGNAL enable_memwb : STD_LOGIC;
     SIGNAL data_in_memwb : STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
