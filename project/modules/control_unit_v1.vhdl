@@ -151,7 +151,7 @@ begin
                         reg_write_en <= '1';
 
                     when "100" =>  -- INC
-                        ALU_op <= "0011";
+                        ALU_op <= "1000";
                         reg_write_en <= '1';
 
                     when "101" =>  -- OUT
