@@ -2,11 +2,11 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
-entity control_unit is
+entity control_unit_v1 is
     port (
      opcode : in  std_logic_vector(9 downto 0);
-     int: in std_logic in;
-     
+     reset  : in  std_logic;
+
      -- output signals
      HLT    : out std_logic; 
      
@@ -53,6 +53,9 @@ entity control_unit is
      flush_decode_execute : out std_logic;  --used in INT and RTI
      flush_decode_mem : out std_logic;
 
+     --for unconditional branch instructions
+     flush_branch_branch : out std_logic;
+
      --signal memory read/write
      mem_write_en : out std_logic;
      pc_address : out std_logic;  --this is for the mux the chooses the either the pc to fetch next instruction or a diffrent address
@@ -74,9 +77,9 @@ entity control_unit is
     --INT 
     index_sel : out std_logic
     );
-end control_unit;
+end control_unit_v1;
 
-architecture rtl of control_unit is
+architecture rtl of control_unit_v1 is
 
     -- opcode fields
     signal instr_type : std_logic_vector(1 downto 0);
@@ -87,7 +90,7 @@ begin
     instr_type <= opcode(9 downto 8); -- instruction category
     instr_id   <= opcode(7 downto 5); -- instruction inside category
 
-    process(opcode, instr_type, instr_id)
+    process(opcode, instr_type, instr_id, reset)
     begin
         ------------------------------------------------------------------
         -- DEFAULT VALUES (everything zero)
@@ -113,6 +116,8 @@ begin
         flush_decode_execute <= '0';
         flush_decode_mem <= '0';
 
+        flush_branch_branch <= '0';
+
         mem_write_en <= '0';
         pc_address <= '0';
         write_data_or_pc <= '0';
@@ -127,7 +132,13 @@ begin
 
         index_sel <= '0';
 
-
+        ------------------------------------------------------------------
+        -- RESET CHECK - if reset is active, keep all outputs at default
+        ------------------------------------------------------------------
+        if reset = '1' then
+            -- All outputs already set to default values above
+            null;
+        else
         ------------------------------------------------------------------
         -- DECODE
         ------------------------------------------------------------------
@@ -152,7 +163,7 @@ begin
                         reg_write_en <= '1';
 
                     when "100" =>  -- INC
-                        ALU_op <= "1000";
+                        ALU_op <= "0011";
                         reg_write_en <= '1';
 
                     when "101" =>  -- OUT
@@ -255,9 +266,19 @@ begin
             ------------------------------------------------------------------
             when "11" =>
                 if instr_id(2) = '0' then
-                branch_unit_en <= '1';
+               
                 flush_decode_decode <= '1';
+
+                if (instr_id = "011") then  -- JMP
+                    flush_branch_branch <= '1';
+                    branch_sel <= '1';
+                
+                else
+                    
+                     -- unconditional branch
+                branch_unit_en <= '1';
                 branch_type <= instr_id;
+                end if;
                 
                 else
 
@@ -319,6 +340,8 @@ end if;
             when others =>
                 null;
         end case;
+
+        end if; -- end reset check
 
     end process;
 
