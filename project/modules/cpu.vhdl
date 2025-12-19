@@ -213,8 +213,8 @@ architecture arch of cpu_top is
     signal branch_sel_bu : std_logic; --
 
     signal decodeExecute_pipe_enable : std_logic; --
-    signal decodeExecute_pipe_input : std_logic_vector(167 downto 0); --
-    signal decodeExecute_pipe_output : std_logic_vector(167 downto 0); --
+    signal decodeExecute_pipe_input : std_logic_vector(199 downto 0); --
+    signal decodeExecute_pipe_output : std_logic_vector(199 downto 0); --
     
 
     signal exe_counter_out : std_logic; --
@@ -228,12 +228,12 @@ architecture arch of cpu_top is
 
     signal flush_decode_execute_branch : std_logic; --
 
-    signal exexecuteMemory_pipe_input : std_logic_vector(167 downto 0); --
-    signal exexecuteMemory_pipe_output : std_logic_vector(167 downto 0);
+    signal exexecuteMemory_pipe_input : std_logic_vector(199 downto 0); --
+    signal exexecuteMemory_pipe_output : std_logic_vector(199 downto 0);
     signal executeMemory_pipe_enable : std_logic; --
 
-    signal memWB_pipe_input : std_logic_vector(167 downto 0); --
-    signal memWB_pipe_output : std_logic_vector(167 downto 0); --
+    signal memWB_pipe_input : std_logic_vector(199 downto 0); --
+    signal memWB_pipe_output : std_logic_vector(199 downto 0); --
     signal memWB_pipe_enable : std_logic; --
 
     signal forward_a : std_logic_vector(1 downto 0);
@@ -245,6 +245,12 @@ architecture arch of cpu_top is
 
     -- memory connections --
     signal pc_or_address : std_logic_vector(31 downto 0);
+    signal flush_decdod : std_logic;
+
+
+    signal alu_input_b : std_logic_vector(31 downto 0);
+    signal alu_input_b_forwarded : std_logic_vector(31 downto 0);
+    signal alu_input_a : std_logic_vector(31 downto 0);
 begin
     
     PC_REG : reg32
@@ -371,8 +377,10 @@ begin
     decodeExecute_pipe_input(165)            <= branch_sel_cu;
     decodeExecute_pipe_input(166)            <= pc_form_mem_cu;
     decodeExecute_pipe_input(167)            <= index_sel_cu;
+
+    decodeExecute_pipe_input(199 downto 168) <= fetchDecode_pipe_output(63 downto 32); -- PC + 1 backup for branch instructions
     generic map (
-        n => 168
+        n => 200
     )
     port map (
         clk => clk,
@@ -395,8 +403,8 @@ begin
     port map (
         reset => '0',
         clk => clk,
-        data_in1 => decodeExecute_pipe_output(31 downto 0),
-        data_in2 => decodeExecute_pipe_output(63 downto 32),
+        data_in1 => alu_input_a,
+        data_in2 => alu_input_b,
         operation => decodeExecute_pipe_output(141 downto 138),
         counter => exe_counter_out,
         data_out => alu_data_out,
@@ -426,15 +434,16 @@ begin
     );
 
 
-    -- i stoped here
+    
     exexecuteMemory_pipe_input(31 downto 0)   <= alu_data_out;
     exexecuteMemory_pipe_input(63 downto 32)  <= in_port;
     exexecuteMemory_pipe_input(95 downto 64)  <= decodeExecute_pipe_input(125 downto 96);
     exexecuteMemory_pipe_input(128 downto 126) <= decodeExecute_pipe_input(128 downto 126); -- Rdest
     exexecuteMemory_pipe_input(167 downto 136) <= decodeExecute_pipe_input(167 downto 136); -- control signals
+    exexecuteMemory_pipe_input(199 downto 168) <= decodeExecute_pipe_input(199 downto 168); -- PC + 1 backup for branch i
     executeMemory : pipeline_reg
     generic map (
-        n => 168
+        n => 200
     )
     port map (
         clk => clk,
@@ -449,9 +458,10 @@ begin
     memWB_pipe_input(127 downto 96) <= mem_data_out; -- mem data
     memWB_pipe_input(130 downto 128) <= exexecuteMemory_pipe_output(128 downto 126); -- Rdest
     memWB_pipe_input(167 downto 136) <= exexecuteMemory_pipe_output(167 downto 136); -- control signals
+    memWB_pipe_input(199 downto 168) <= exexecuteMemory_pipe_input(199 downto 168); -- PC + 1 backup for branch i
     MemoryWB : pipeline_reg
     generic map (
-        n => 168
+        n => 200
     )
     port map (
         clk => clk,
@@ -484,6 +494,8 @@ begin
     
     pc_data <=  fetchDecode_pipe_output(31 downto 0) when branch_sel_bu = '1' or branch_sel_cu = '1'
                 else pc + 1;
+    
+    enable_pc <= not exexecuteMemory_pipe_output(137) and not HLT_cu;
 
     -- stack pointer connections --
     sp_next_data <= sp + 1 when exexecuteMemory_pipe_output(161 downto 160) = "01"
@@ -491,13 +503,104 @@ begin
                  else sp;
 
     -- memory connections --
-    pc_or_address <= pc when exexecuteMemory_pipe_output(166) = '1'
-                        else sp when exexecuteMemory_pipe_output(167) = '1'
-                        else exexecuteMemory_pipe_output(95 downto 64);
+    mem_address <= pc when exexecuteMemory_pipe_output(158) = '0'
+                     else exexecuteMemory_pipe_output(31 downto 0);
 
-    mem_next_data <= exexecuteMemory_pipe_output(63 downto 32) when exexecuteMemory_pipe_output(159) = '1'
-                  else sp when exexecuteMemory_pipe_output(160) = '1' or reset = '1'
-                  else exexecuteMemory_pipe_output(95 downto 64);
+    mem_next_data <= (others=> '0') when reset = '1'
+                     else pc_or_address when exexecuteMemory_pipe_output(160) = '0'
+                     else sp;
+                   
 
+    mem_write <= exexecuteMemory_pipe_output(157) and not exe_counter_out;
+    
+    fetchDecode_pipe_input(31 downto 0) <= mem_data_out when flush_decdod = '0'
+                            else (others => '0');
+
+
+    -- CONNECTIONS (continued) --
+
+    -- Fetch/Decode Pipeline connections --
+    fetchDecode_pipe_enable <= '1' when reset = '0' and enable_pc = '1'
+                            else '0';
+
+    flush_decdod <= flush_decode_decode_cu or 
+                    flush_decode_execute_cu or 
+                    flush_decode_mem_cu or
+                    flush_branch_branch_cu or
+                    flush_decode_execute_branch;
+
+    -- Register File connections --
+    R1_reg_file_in <= fetchDecode_pipe_output(21 downto 19); -- Rsrc1
+    R2_reg_file_in <= fetchDecode_pipe_output(18 downto 16) when R2_sel_cu = '0' -- Rsrc2
+                    else fetchDecode_pipe_output(15 downto 13); -- Rdest (for certain instructions)
+
+    WB_address_reg_file_in <= memWB_pipe_output(130 downto 128); -- Rdest from WB stage
+    reg_file_write_enable <= memWB_pipe_output(135); -- Reg_write_enable from WB stage
+
+    -- WB data selection (MEM_ALU signal)
+    WB_data_reg_file_in <= memWB_pipe_output(127 downto 96) when memWB_pipe_output(148 downto 145) = "0001" -- Memory data
+                        else memWB_pipe_output(63 downto 32) when memWB_pipe_output(143) = '1' -- IN_PORT
+                        else memWB_pipe_output(95 downto 64) when memWB_pipe_output(149) = '1' -- Immediate
+                        else memWB_pipe_output(31 downto 0); -- ALU result
+
+    -- Decode/Execute Pipeline connections --
+    decodeExecute_pipe_enable <= '1' when reset = '0' and 
+                                        flush_decode_execute_cu = '0' and
+                                        flush_decode_execute_branch = '0'
+                                else '0';
+
+    -- ALU input forwarding (using forwarding unit outputs)
+    -- Forward A (R1)
+    
+    alu_input_a <= exexecuteMemory_pipe_output(31 downto 0) when forward_a = "10" -- From EX/MEM
+                else memWB_pipe_output(31 downto 0) when forward_a = "01" -- From MEM/WB
+                else decodeExecute_pipe_output(31 downto 0); -- Normal R1
+
+    -- Forward B (R2)
+    
+    alu_input_b_forwarded <= exexecuteMemory_pipe_output(31 downto 0) when forward_b = "10" -- From EX/MEM
+                            else memWB_pipe_output(31 downto 0) when forward_b = "01" -- From MEM/WB
+                            else decodeExecute_pipe_output(63 downto 32); -- Normal R2
+
+    -- R2 selection (immediate vs register)
+    
+    alu_input_b <= decodeExecute_pipe_output(125 downto 96) when decodeExecute_pipe_output(149) = '1' -- Immediate
+                else alu_input_b_forwarded; -- Forwarded R2
+
+    -- Connect to ALU (update the ALU port map)
+    -- Replace the previous ALU data_in connections with:
+    -- data_in1 => alu_input_a,
+    -- data_in2 => alu_input_b,
+
+    -- Execute/Memory Pipeline connections --
+    executeMemory_pipe_enable <= '1' when reset = '0' and 
+                                        flush_decode_mem_cu = '0'
+                                else '0';
+
+    -- Memory write data (for store instructions)
+    mem_data_in <= exexecuteMemory_pipe_output(63 downto 32) when exexecuteMemory_pipe_output(159) = '1' -- Write R2 (PC for CALL/INT)
+                else exexecuteMemory_pipe_output(31 downto 0); -- Write ALU result
+
+    -- Memory address (with index selection)
+    signal memory_address_base : std_logic_vector(31 downto 0);
+    memory_address_base <= exexecuteMemory_pipe_output(31 downto 0) when exexecuteMemory_pipe_output(167) = '1' -- Use ALU result as address
+                        else exexecuteMemory_pipe_output(95 downto 64); -- Use immediate as address
+
+    mem_address <= memory_address_base when exexecuteMemory_pipe_output(158) = '1' -- Normal memory access
+                else pc; -- Instruction fetch
+
+    -- Memory/WB Pipeline connections --
+    memWB_pipe_enable <= '1' when reset = '0' else '0';
+
+    -- OUT_PORT connections --
+    out_port <= memWB_pipe_output(31 downto 0)(3 downto 0) when memWB_pipe_output(142) = '1' -- OUT_PORT_EN
+            else (others => '0');
+
+    -- Branch selection --
+    branch_sel_final <= branch_sel_bu or exexecuteMemory_pipe_output(165); -- Branch from BU or immediate branch
+
+    -- Interrupt and HLT handling --
+    signal hlt_signal : std_logic;
+    hlt_signal <= memWB_pipe_output(136) or exexecuteMemory_pipe_output(136) or decodeExecute_pipe_output(136);
 
 end arch;
