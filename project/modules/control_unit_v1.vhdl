@@ -5,7 +5,8 @@ use IEEE.NUMERIC_STD.ALL;
 entity control_unit is
     port (
      opcode : in  std_logic_vector(9 downto 0);
-
+     int: in std_logic in;
+     
      -- output signals
      HLT    : out std_logic; 
      
