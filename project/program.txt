@@ -1,0 +1,58 @@
+# =======================
+# HARD TEST CASES
+# =======================
+
+.ORG 0
+# --- One Operand ---
+NOP        # PC should increment
+SETC       # Carry flag should be set
+IN R0      # R0 = input value
+IN R1      # R1 = input value
+IN R2      # R2 = input value
+NOT R0     # 1's complement of R0
+INC R1     # Increment R1
+OUT R2     # Send R2 to output port
+HLT        # Halt PC
+
+# --- Two Operands ---
+.ORG 20
+MOV R0, R3   # R3 = R0
+SWAP R1, R2  # Swap values of R1 and R2
+ADD R4, R0, R1  # R4 = R0 + R1
+SUB R5, R2, R3  # R5 = R2 - R3
+AND R6, R4, R5  # R6 = R4 AND R5
+IADD R7, R6, 15 # R7 = R6 + 15
+
+# --- Memory Operations ---
+.ORG 40
+PUSH R0     # Push R0 to stack
+PUSH R1     # Push R1 to stack
+POP R2      # Pop to R2
+LDM R3, 123 # Load immediate to R3
+LDD R4, 2(R3) # Load from memory address R3+2
+STD R5, 3(R4) # Store R5 to memory address R4+3
+
+# --- Branch Operations ---
+.ORG 60
+JZ 80       # Jump to 80 if Z=1
+JN 90       # Jump to 90 if N=1
+JC 100      # Jump to 100 if C=1
+JMP 110     # Unconditional jump to 110
+CALL 120    # Call subroutine at 120
+RET         # Return from subroutine
+INT 0       # Software interrupt 0
+INT 1       # Software interrupt 1
+RTI         # Return from interrupt
+
+# --- Subroutine for CALL/RET ---
+.ORG 120
+IN R0
+ADD R0, R0, R1
+RET
+
+# --- Space filler to ensure JMP/branch targets exist ---
+.ORG 150
+NOP
+NOP
+NOP
+HLT
