@@ -184,7 +184,7 @@ class Assembler:
 
 
 def main():
-    asm = Assembler(mem_size=2048)
+    asm = Assembler(mem_size=1024)
     asm.assemble("program.txt")
     asm.write_txt("memory.txt")
     asm.write_mif("memory.mif")
