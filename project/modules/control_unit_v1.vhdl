@@ -6,6 +6,7 @@ entity control_unit_v1 is
     port (
      opcode : in  std_logic_vector(9 downto 0);
      reset  : in  std_logic;
+     swap_sel : in  std_logic;
 
      -- output signals
      HLT    : out std_logic; 
@@ -99,6 +100,8 @@ begin
         stop_pc <= '0';
 
         ALU_op <= "0000";
+
+        swap_sel <= '0';
 
         out_port_en <= '0';
         in_port_en  <= '0';
@@ -201,6 +204,7 @@ begin
                         ALU_op <= "0110";
                         exe_counter_en <= '1';
                         stop_pc <= '1';
+                        swap_sel <= '1';
                     when others =>
                         null;
                 end case;
