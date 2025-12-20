@@ -1,12 +1,13 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
 
 entity cpu_top is
     Port ( 
             clk : in STD_LOGIC;
             reset, int : in STD_LOGIC;
-            in_port : in std_logic_vector(3 downto 0);
-            out_port: out std_logic_vector(3 downto 0)
+            in_port : in std_logic_vector(31 downto 0);
+            out_port: out std_logic_vector(31 downto 0)
         );
 end cpu_top;
 
@@ -174,16 +175,16 @@ architecture arch of cpu_top is
 
 
     signal reg_file_write_enable : std_logic;
-    signal R1_reg_file_in : std_logic_vector(31 downto 0);
-    signal R2_reg_file_in : std_logic_vector(31 downto 0);
-    signal WB_address_reg_file_in : std_logic_vector(31 downto 0);
+    signal R1_reg_file_in : std_logic_vector(2 downto 0);
+    signal R2_reg_file_in : std_logic_vector(2 downto 0);
+    signal WB_address_reg_file_in : std_logic_vector(2 downto 0);
     signal WB_data_reg_file_in : std_logic_vector(31 downto 0);
 
     signal R1_reg_file_out : std_logic_vector(31 downto 0);
     signal R2_reg_file_out : std_logic_vector(31 downto 0);
     
     signal opcode : std_logic_vector(9 downto 0);
-    signal int : std_logic;
+    
     
     signal HLT_cu    : std_logic; 
     signal stop_pc_cu : std_logic;
@@ -215,8 +216,8 @@ architecture arch of cpu_top is
     signal branch_sel_bu : std_logic; --
 
     signal decodeExecute_pipe_enable : std_logic; --
-    signal decodeExecute_pipe_input : std_logic_vector(199 downto 0); --
-    signal decodeExecute_pipe_output : std_logic_vector(199 downto 0); --
+    signal decodeExecute_pipe_input : std_logic_vector(234 downto 0); --
+    signal decodeExecute_pipe_output : std_logic_vector(234 downto 0); --
     
 
     signal exe_counter_out : std_logic; --
@@ -230,8 +231,8 @@ architecture arch of cpu_top is
 
     signal flush_decode_execute_branch : std_logic; --
 
-    signal exexecuteMemory_pipe_input : std_logic_vector(199 downto 0); --
-    signal exexecuteMemory_pipe_output : std_logic_vector(199 downto 0);
+    signal executeMemory_pipe_input : std_logic_vector(199 downto 0); --
+    signal executeMemory_pipe_output : std_logic_vector(199 downto 0);
     signal executeMemory_pipe_enable : std_logic; --
 
     signal memWB_pipe_input : std_logic_vector(199 downto 0); --
@@ -260,6 +261,7 @@ architecture arch of cpu_top is
 
     signal r1_or_r2 : std_logic_vector(2 downto 0);
     signal r1_r2_or_rdest : std_logic_vector(2 downto 0);
+    signal mem_counter_out : std_logic;
 begin
     
     PC_REG : reg32
@@ -278,10 +280,10 @@ begin
         en => '1',
         d => sp_next_data,
         q => sp
-    )
+    );
 
     mem_read <= not mem_write;
-    Memory : memory
+    MemoryINS : memory
     port map (
         clk => clk,
         reset => '0',
@@ -293,7 +295,7 @@ begin
     );
 
     fetchDecode_pipe_input(31 downto 0) <= mem_data_in;
-    fetchDecode_pipe_input(63 downto 32) <= pc + 1;
+    fetchDecode_pipe_input(63 downto 32) <= std_logic_vector(unsigned(pc) + 1);
     fetchDecode : pipeline_reg
     generic map (
         n => 64
@@ -353,7 +355,7 @@ begin
     decodeExecute_pipe_input(31 downto 0)   <= R1_reg_file_out;
     decodeExecute_pipe_input(63 downto 32)  <= R2_reg_file_out;
     decodeExecute_pipe_input(95 downto 64)  <= fetchDecode_pipe_output(63 downto 32); -- PC + 1
-    decodeExecute_pipe_input(125 downto 96) <= mem_data_out; -- Immediate / Offset value
+    -- decodeExecute_pipe_input(125 downto 96) <= mem_data_out; -- Immediate / Offset value
     decodeExecute_pipe_input(128 downto 126) <= fetchDecode_pipe_output(21 downto 19); -- Rdest
     decodeExecute_pipe_input(131 downto 129) <= fetchDecode_pipe_output(18 downto 16); -- Rsrc1
     decodeExecute_pipe_input(134 downto 132) <= fetchDecode_pipe_output(15 downto 13); -- Rsrc2
@@ -384,14 +386,17 @@ begin
     decodeExecute_pipe_input(160)            <= sp_sel_cu;
     decodeExecute_pipe_input(162 downto 161) <= sp_alu_op_cu;
     decodeExecute_pipe_input(163)            <= branch_unit_en_cu;
-    decodeExecute_pipe_input(164)            <= branch_type_cu;
+    -- decodeExecute_pipe_input(164)            <= branch_type_cu;
     decodeExecute_pipe_input(165)            <= branch_sel_cu;
     decodeExecute_pipe_input(166)            <= pc_form_mem_cu;
     decodeExecute_pipe_input(167)            <= index_sel_cu;
 
     decodeExecute_pipe_input(199 downto 168) <= fetchDecode_pipe_output(63 downto 32); -- PC + 1 backup for branch instructions
+    decodeExecute_pipe_input(202 downto 200) <= branch_type_cu;
+    decodeExecute_pipe_input(234 downto 203) <= mem_data_out; 
+    decodeExecute : pipeline_reg 
     generic map (
-        n => 200
+        n => 235
     )
     port map (
         clk => clk,
@@ -407,7 +412,7 @@ begin
         count_out => exe_counter_out
     );
 
-    Alu : alu
+    MYAlu : alu
     generic map (
         n => 32
     )
@@ -441,17 +446,17 @@ begin
         flags => flagas_reg_out,
         branch_type => decodeExecute_pipe_output(163 downto 161),
         branch_sel => branch_sel_bu,
-        flush_decode_execute_branch => flush_decode_execute_branch,
+        flush_decode_execute_branch => flush_decode_execute_branch
     );
 
 
     
-    exexecuteMemory_pipe_input(31 downto 0)   <= alu_data_out;
-    exexecuteMemory_pipe_input(63 downto 32)  <= in_port;
-    exexecuteMemory_pipe_input(95 downto 64)  <= decodeExecute_pipe_input(125 downto 96);
-    exexecuteMemory_pipe_input(128 downto 126) <= r1_r2_or_rdest; -- Rdest
-    exexecuteMemory_pipe_input(167 downto 136) <= decodeExecute_pipe_input(167 downto 136); -- control signals
-    exexecuteMemory_pipe_input(199 downto 168) <= decodeExecute_pipe_input(199 downto 168); -- PC + 1 backup for branch i
+    executeMemory_pipe_input(31 downto 0)   <= alu_data_out;
+    executeMemory_pipe_input(63 downto 32)  <= in_port;
+    executeMemory_pipe_input(95 downto 64)  <= decodeExecute_pipe_input(234 downto 203);
+    executeMemory_pipe_input(128 downto 126) <= r1_r2_or_rdest; -- Rdest
+    executeMemory_pipe_input(167 downto 136) <= decodeExecute_pipe_input(167 downto 136); -- control signals
+    executeMemory_pipe_input(199 downto 168) <= decodeExecute_pipe_input(199 downto 168); -- PC + 1 backup for branch i
     executeMemory : pipeline_reg
     generic map (
         n => 200
@@ -459,17 +464,25 @@ begin
     port map (
         clk => clk,
         enable => executeMemory_pipe_enable,
-        data_in => exexecuteMemory_pipe_input,
-        data_out => exexecuteMemory_pipe_output
+        data_in => executeMemory_pipe_input,
+        data_out => executeMemory_pipe_output
     );
 
-    memWB_pipe_input(31 downto 0)   <= exexecuteMemory_pipe_output(31 downto 0); -- ALU result
-    memWB_pipe_input(63 downto 32)  <= exexecuteMemory_pipe_output(63 downto 32); -- in_port data
-    memWB_pipe_input(95 downto 64)  <= exexecuteMemory_pipe_output(95 downto 64); -- immediate
+    memCounter : one_bit_counter
+    port map (
+        clk => clk,
+        counter_enable => executeMemory_pipe_output(152),
+        count_out => mem_counter_out
+    );
+
+
+    memWB_pipe_input(31 downto 0)   <= executeMemory_pipe_output(31 downto 0); -- ALU result
+    memWB_pipe_input(63 downto 32)  <= executeMemory_pipe_output(63 downto 32); -- in_port data
+    memWB_pipe_input(95 downto 64)  <= executeMemory_pipe_output(95 downto 64); -- immediate
     memWB_pipe_input(127 downto 96) <= mem_data_out; -- mem data
-    memWB_pipe_input(130 downto 128) <= exexecuteMemory_pipe_output(128 downto 126); -- Rdest
-    memWB_pipe_input(167 downto 136) <= exexecuteMemory_pipe_output(167 downto 136); -- control signals
-    memWB_pipe_input(199 downto 168) <= exexecuteMemory_pipe_input(199 downto 168); -- PC + 1 backup for branch i
+    memWB_pipe_input(130 downto 128) <= executeMemory_pipe_output(128 downto 126); -- Rdest
+    memWB_pipe_input(167 downto 136) <= executeMemory_pipe_output(167 downto 136); -- control signals
+    memWB_pipe_input(199 downto 168) <= executeMemory_pipe_output(199 downto 168); -- PC + 1 backup for branch i
     MemoryWB : pipeline_reg
     generic map (
         n => 200
@@ -486,10 +499,10 @@ begin
     port map (
         id_ex_rs => decodeExecute_pipe_output(131 downto 129),
         id_ex_rt => decodeExecute_pipe_output(134 downto 132),
-        ex_mem_rd => exexecuteMemory_pipe_output(128 downto 126),
+        ex_mem_rd => executeMemory_pipe_output(128 downto 126),
         mem_wb_rd => memWB_pipe_output(128 downto 126),
         counter => exe_counter_out,
-        ex_mem_reg_write => exexecuteMemory_pipe_output(135),
+        ex_mem_reg_write => executeMemory_pipe_output(135),
         mem_wb_reg_write => memWB_pipe_output(135),
         forward_a => forward_a,
         forward_b => forward_b
@@ -500,34 +513,35 @@ begin
     -- CONNECTIONS --
 
     -- program counter connections --
-    pc_next_data <= mem_data when exexecuteMemory_pipe_output(166) or reset = '1'
+    pc_next_data <= mem_data when (executeMemory_pipe_output(166) = '1' or reset = '1')
                     else pc_data;
     
     pc_data <=  fetchDecode_pipe_output(31 downto 0) when branch_sel_bu = '1' or branch_sel_cu = '1'
-                else pc + 1;
+                else std_logic_vector(unsigned(pc) + 1);
     
-    enable_pc <= not exexecuteMemory_pipe_output(137) and not HLT_cu;
+    enable_pc <= not executeMemory_pipe_output(137) and not HLT_cu;
 
     -- stack pointer connections --
-    sp_next_data <= sp + 1 when exexecuteMemory_pipe_output(161 downto 160) = "01"
-                 else sp - 1 when exexecuteMemory_pipe_output(161 downto 160) = "10"
+    sp_next_data <= std_logic_vector(unsigned(sp) + 1) when executeMemory_pipe_output(161 downto 160) = "01"
+                 else std_logic_vector(unsigned(sp) - 1) when executeMemory_pipe_output(161 downto 160) = "10"
                  else sp;
 
     -- memory connections --
-    pc_or_address <= pc when exexecuteMemory_pipe_output(158) = '0'
-                     else exexecuteMemory_pipe_output(31 downto 0);
+    pc_or_address <= pc when executeMemory_pipe_output(158) = '0'
+                     else executeMemory_pipe_output(31 downto 0);
 
     mem_next_data <= (others=> '0') when reset = '1'
-                     else pc_or_address when exexecuteMemory_pipe_output(160) = '0'
+                     else pc_or_address when executeMemory_pipe_output(160) = '0'
                      else sp;
                    
 
-    mem_write <= exexecuteMemory_pipe_output(157) and not exe_counter_out;
+    mem_write <= executeMemory_pipe_output(157) and not exe_counter_out;
     
     fetchDecode_pipe_input(31 downto 0) <= mem_data_out when flush_decode = '0'
                             else (others => '0');
     
-    flush_decode <= flush_decode_decode_cu or decodeExecute_pipe_output(154) or executeMemory_pipe_output(155) or flush_decode_execute_branch;
+    flush_decode <= '1' when (flush_decode_decode_cu = '1' or decodeExecute_pipe_output(154) = '1' or executeMemory_pipe_output(155) = '1' or flush_decode_execute_branch = '1') else '0';
+
 
     fetchDecode_pipe_enable <= (not reset and hlt_cu) or (decodeExecute_pipe_output(152) nand not exe_counter_out) or (executeMemory_pipe_output(152) nand not mem_counter_out);
 
@@ -536,11 +550,11 @@ begin
     -- regfile --  
     R1_reg_file_in <= fetchDecode_pipe_output(18 downto 16);
     R2_reg_file_in <= fetchDecode_pipe_output(21 downto 19);
-    write_reg_address <= memWB_pipe_output(130 downto 128);
-    write_enable <= memWB_pipe_output(144);
+    WB_address_reg_file_in <= memWB_pipe_output(130 downto 128);
+    reg_file_write_enable <= memWB_pipe_output(144);
                 
-    write_data <=  memWB_pipe_output(127 downto 96) when memWB_pipe_output(145) = '1'
-                   else alu_inport_imm;
+    WB_data_reg_file_in <=  memWB_pipe_output(127 downto 96) when memWB_pipe_output(145) = '1'
+                            else alu_inport_imm;
 
     alu_inport_imm <= memWB_pipe_output(63 downto 32) when memWB_pipe_output(143) = '1'
                       else memWB_pipe_output(95 downto 64) when memWB_pipe_output(149) = '1'
@@ -559,14 +573,16 @@ begin
     
     alu_data_in2 <= r2_or_imm when forward_b = "00"
                     else memWB_pipe_output(31 downto 0) when forward_b = "01"
-                    else write_data;
+                    else WB_data_reg_file_in;
     
-    Rsrc1 <= decodeExecute_pipe_output(125 downto 123);
+    R1_reg_file_in <= decodeExecute_pipe_output(125 downto 123);
+    R2_reg_file_in <= decodeExecute_pipe_output(128 downto 126);
     r1_or_index <= decodeExecute_pipe_output(31 downto 0) when index_sel_cu = '0'
-                   else  (others => "0" , decodeExecute_pipe_output(146)) when index_sel_cu = '1';
+               else (31 downto 1 => '0') & decodeExecute_pipe_output(146);
+
     alu_data_in1 <= r1_or_index when forward_a = "00"
                     else memWB_pipe_output(31 downto 0) when forward_a = "01"
-                    else write_data;
+                    else WB_data_reg_file_in;
 
     r1_or_r2 <= decodeExecute_pipe_output(131 downto 129) when exe_counter_out = '1'
                 else decodeExecute_pipe_output(134 downto 132);
