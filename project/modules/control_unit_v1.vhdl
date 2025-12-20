@@ -6,7 +6,7 @@ entity control_unit_v1 is
     port (
      opcode : in  std_logic_vector(9 downto 0);
      reset  : in  std_logic;
-     swap_sel : in  std_logic;
+     swap_sel : out  std_logic;
 
      -- output signals
      HLT    : out std_logic; 
