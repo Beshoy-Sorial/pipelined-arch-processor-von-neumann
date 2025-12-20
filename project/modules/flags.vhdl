@@ -8,7 +8,7 @@ entity Reg3BitStoreRestore is
         store    : in  STD_LOGIC; -- Save current data to cache
         restore  : in  STD_LOGIC; -- Load data from cache to main
         load     : in  STD_LOGIC; -- Standard write enable
-        data_in  : in  STD_LOGIC_VECTOR(2 downto 2);
+        data_in  : in  STD_LOGIC_VECTOR(2 downto 0);  
         data_out : out STD_LOGIC_VECTOR(2 downto 0)
     );
 end Reg3BitStoreRestore;

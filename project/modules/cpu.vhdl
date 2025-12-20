@@ -147,7 +147,7 @@ architecture arch of cpu_top is
             store    : in  STD_LOGIC; -- Save current data to cache
             restore  : in  STD_LOGIC; -- Load data from cache to main
             load     : in  STD_LOGIC; -- Standard write enable
-            data_in  : in  STD_LOGIC_VECTOR(2 downto 2);
+            data_in  : in  STD_LOGIC_VECTOR(2 downto 0);
             data_out : out STD_LOGIC_VECTOR(2 downto 0)
         );
     end component;
@@ -436,7 +436,7 @@ begin
         store => store_alu,
         restore => restore_alu,
         load => '1',
-        data_in => flag_values_alu(2 downto 2),
+        data_in => flag_values_alu,
         data_out => flagas_reg_out -- NZC
     );
 
