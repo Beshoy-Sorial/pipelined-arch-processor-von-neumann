@@ -20,206 +20,98 @@ END ENTITY;
 
 ARCHITECTURE alu_behave OF alu IS
 
-    SIGNAL adder_in1, adder_in2, adder_out : STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
-    SIGNAL carry : STD_LOGIC;
-    SIGNAL sub_sel : STD_LOGIC;
     SIGNAL result : STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
     SIGNAL neg_flag, zero_flag, carry_flag : STD_LOGIC;
     SIGNAL temp_and, temp_not : STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
-    
-    COMPONENT genFullAdder IS
-        GENERIC (n : INTEGER := 32);
-        PORT (
-            a : IN STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
-            b : IN STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
-            cin : IN STD_LOGIC;
-            f : OUT STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
-            cout : OUT STD_LOGIC
-        );
-    END COMPONENT;
+    SIGNAL add_result, sub_result, inc_result, add2_result : STD_LOGIC_VECTOR(n DOWNTO 0);
 
 BEGIN
 
-    -- Instantiate adder component
-    FULL_ADDER : genFullAdder
-        GENERIC MAP(n => n)
-        PORT MAP(
-            a => adder_in1,
-            b => adder_in2,
-            cin => sub_sel,
-            f => adder_out,
-            cout => carry
-        );
+    -- Arithmetic operations with carry detection (use n+1 bits)
+    add_result <= std_logic_vector(unsigned('0' & data_in1) + unsigned('0' & data_in2));
+    sub_result <= std_logic_vector(unsigned('0' & data_in1) - unsigned('0' & data_in2));
+    inc_result <= std_logic_vector(unsigned('0' & data_in1) + 1);
+    add2_result <= std_logic_vector(unsigned('0' & data_in1) + 2);
+    
+    -- Logic operations
+    temp_and <= data_in1 AND data_in2;
+    temp_not <= NOT data_in1;
 
-    -- Combinational logic for ALU operations
-    PROCESS(operation, data_in1, data_in2, counter, adder_out, carry)
-    BEGIN
-        -- Default values
-        adder_in1 <= (OTHERS => '0');
-        adder_in2 <= (OTHERS => '0');
-        sub_sel <= '0';
-        result <= (OTHERS => '0');
-        neg_flag <= '0';
-        zero_flag <= '0';
-        carry_flag <= '0';
-        store <= '0';
-        Restore <= '0';
-        temp_and <= (OTHERS => '0');
-        temp_not <= (OTHERS => '0');
-        
-        CASE operation IS
-            -- 0001: ADD
-            WHEN "0001" =>
-                adder_in1 <= data_in1;
-                adder_in2 <= data_in2;
-                sub_sel <= '0';
-                result <= adder_out;
-                carry_flag <= carry;
-                IF adder_out = std_logic_vector(to_unsigned(0, n)) THEN
-                    zero_flag <= '1';
-                ELSE
-                    zero_flag <= '0';
-                END IF;
-                neg_flag <= adder_out(n - 1);
-                store <= '1';
+    -- ============================================
+    -- RESULT SELECTION
+    -- ============================================
+    result <= (OTHERS => '0') WHEN reset = '1' ELSE
+              add_result(n - 1 DOWNTO 0) WHEN operation = "0001" ELSE  -- ADD
+              sub_result(n - 1 DOWNTO 0) WHEN operation = "0010" ELSE  -- SUB
+              temp_and WHEN operation = "0011" ELSE   -- AND
+              data_in1 WHEN operation = "0100" ELSE   -- First/MOV
+              data_in2 WHEN operation = "0101" ELSE   -- Second
+              data_in2 WHEN (operation = "0110" AND counter = '1') ELSE  -- SWAP with counter
+              data_in1 WHEN operation = "0110" ELSE   -- SWAP without counter
+              data_in1 WHEN operation = "0111" ELSE   -- SetC
+              inc_result(n - 1 DOWNTO 0) WHEN operation = "1000" ELSE  -- INC
+              temp_not WHEN operation = "1001" ELSE   -- NOT
+              add2_result(n - 1 DOWNTO 0) WHEN operation = "1010" ELSE  -- Add 2
+              data_in1 WHEN operation = "1011" ELSE   -- Restore
+              data_in1;  -- Default
 
-            -- 0010: SUB
-            WHEN "0010" =>
-                adder_in1 <= data_in1;
-                adder_in2 <= NOT data_in2;
-                sub_sel <= '1';
-                result <= adder_out;
-                carry_flag <= '0';
-                IF adder_out = std_logic_vector(to_unsigned(0, n)) THEN
-                    zero_flag <= '1';
-                ELSE
-                    zero_flag <= '0';
-                END IF;
-                neg_flag <= adder_out(n - 1);
-                store <= '1';
+    -- ============================================
+    -- FLAG GENERATION
+    -- ============================================
+    neg_flag <= '0' WHEN reset = '1' ELSE
+                add_result(n - 1) WHEN operation = "0001" ELSE  -- ADD
+                sub_result(n - 1) WHEN operation = "0010" ELSE  -- SUB
+                temp_and(n - 1) WHEN operation = "0011" ELSE   -- AND
+                data_in1(n - 1) WHEN operation = "0100" ELSE   -- First/MOV
+                data_in2(n - 1) WHEN operation = "0101" ELSE   -- Second
+                data_in1(n - 1) WHEN operation = "0111" ELSE   -- SetC
+                inc_result(n - 1) WHEN operation = "1000" ELSE  -- INC
+                temp_not(n - 1) WHEN operation = "1001" ELSE   -- NOT
+                add2_result(n - 1) WHEN operation = "1010" ELSE  -- Add 2
+                '0';
 
-            -- 0011: AND (also used for INC in control unit)
-            WHEN "0011" =>
-                temp_and <= data_in1 AND data_in2;
-                result <= temp_and;
-                IF temp_and = std_logic_vector(to_unsigned(0, n)) THEN
-                    zero_flag <= '1';
-                ELSE
-                    zero_flag <= '0';
-                END IF;
-                neg_flag <= temp_and(n - 1);
-                store <= '1';
+    zero_flag <= '0' WHEN reset = '1' ELSE
+                 '1' WHEN (operation = "0001" AND add_result(n - 1 DOWNTO 0) = std_logic_vector(to_unsigned(0, n))) ELSE
+                 '1' WHEN (operation = "0010" AND sub_result(n - 1 DOWNTO 0) = std_logic_vector(to_unsigned(0, n))) ELSE
+                 '1' WHEN (operation = "0011" AND temp_and = std_logic_vector(to_unsigned(0, n))) ELSE
+                 '1' WHEN (operation = "0100" AND data_in1 = std_logic_vector(to_unsigned(0, n))) ELSE
+                 '1' WHEN (operation = "0101" AND data_in2 = std_logic_vector(to_unsigned(0, n))) ELSE
+                 '1' WHEN (operation = "1000" AND inc_result(n - 1 DOWNTO 0) = std_logic_vector(to_unsigned(0, n))) ELSE
+                 '1' WHEN (operation = "1001" AND temp_not = std_logic_vector(to_unsigned(0, n))) ELSE
+                 '1' WHEN (operation = "1010" AND add2_result(n - 1 DOWNTO 0) = std_logic_vector(to_unsigned(0, n))) ELSE
+                 '0';
 
-            -- 0100: First/MOV (output first input unchanged)
-            WHEN "0100" =>
-                result <= data_in1;
-                IF data_in1 = std_logic_vector(to_unsigned(0, n)) THEN
-                    zero_flag <= '1';
-                ELSE
-                    zero_flag <= '0';
-                END IF;
-                neg_flag <= data_in1(n - 1);
-                store <= '1';
+    carry_flag <= '0' WHEN reset = '1' ELSE
+                  add_result(n) WHEN operation = "0001" ELSE  -- ADD (carry from bit n)
+                  '1' WHEN operation = "0111" ELSE    -- SetC
+                  inc_result(n) WHEN operation = "1000" ELSE  -- INC (carry from bit n)
+                  add2_result(n) WHEN operation = "1010" ELSE  -- Add 2 (carry from bit n)
+                  '0';
 
-            -- 0101: Second (output second input unchanged)
-            WHEN "0101" =>
-                result <= data_in2;
-                IF data_in2 = std_logic_vector(to_unsigned(0, n)) THEN
-                    zero_flag <= '1';
-                ELSE
-                    zero_flag <= '0';
-                END IF;
-                neg_flag <= data_in2(n - 1);
-                store <= '1';
+    -- ============================================
+    -- CONTROL SIGNALS
+    -- ============================================
+    store <= '0' WHEN reset = '1' ELSE
+             '1' WHEN operation = "0001" ELSE  -- ADD
+             '1' WHEN operation = "0010" ELSE  -- SUB
+             '1' WHEN operation = "0011" ELSE  -- AND
+             '1' WHEN operation = "0100" ELSE  -- First/MOV
+             '1' WHEN operation = "0101" ELSE  -- Second
+             '1' WHEN operation = "0110" ELSE  -- SWAP
+             '1' WHEN operation = "0111" ELSE  -- SetC
+             '1' WHEN operation = "1000" ELSE  -- INC
+             '1' WHEN operation = "1001" ELSE  -- NOT
+             '1' WHEN operation = "1010" ELSE  -- Add 2
+             '0';
 
-            -- 0110: First until counter (used for SWAP)
-            WHEN "0110" =>
-                IF counter = '1' THEN
-                    result <= data_in2;
-                ELSE
-                    result <= data_in1;
-                END IF;
-                store <= '1';
+    Restore <= '0' WHEN reset = '1' ELSE
+               '1' WHEN operation = "1011" ELSE  -- Restore
+               '0';
 
-            -- 0111: SetC (Set Carry Flag) - pass through first input
-            WHEN "0111" =>
-                result <= data_in1;
-                carry_flag <= '1';
-                IF data_in1 = std_logic_vector(to_unsigned(0, n)) THEN
-                    zero_flag <= '1';
-                ELSE
-                    zero_flag <= '0';
-                END IF;
-                neg_flag <= data_in1(n - 1);
-                store <= '1';
-
-            -- 1000: INC
-            WHEN "1000" =>
-                adder_in1 <= data_in1;
-                adder_in2 <= std_logic_vector(to_unsigned(1, n));
-                sub_sel <= '0';
-                result <= adder_out;
-                carry_flag <= carry;
-                IF adder_out = std_logic_vector(to_unsigned(0, n)) THEN
-                    zero_flag <= '1';
-                ELSE
-                    zero_flag <= '0';
-                END IF;
-                neg_flag <= adder_out(n - 1);
-                store <= '1';
-
-            -- 1001: NOT (Bitwise NOT)
-            WHEN "1001" =>
-                temp_not <= NOT data_in1;
-                result <= temp_not;
-                IF temp_not = std_logic_vector(to_unsigned(0, n)) THEN
-                    zero_flag <= '1';
-                ELSE
-                    zero_flag <= '0';
-                END IF;
-                neg_flag <= temp_not(n - 1);
-                store <= '1';
-
-            -- 1010: Add 2 and cache flags (for INT instruction)
-            WHEN "1010" =>
-                adder_in1 <= data_in1;
-                adder_in2 <= std_logic_vector(to_unsigned(2, n));
-                sub_sel <= '0';
-                result <= adder_out;
-                carry_flag <= carry;
-                IF adder_out = std_logic_vector(to_unsigned(0, n)) THEN
-                    zero_flag <= '1';
-                ELSE
-                    zero_flag <= '0';
-                END IF;
-                neg_flag <= adder_out(n - 1);
-                store <= '1';
-
-            -- 1011: Restore flags (for RTI instruction)
-            WHEN "1011" =>
-                result <= data_in1;
-                Restore <= '1';
-                store <= '0';
-
-            -- Default: pass through data_in1
-            WHEN OTHERS =>
-                result <= data_in1;
-                store <= '0';
-
-        END CASE;
-
-    END PROCESS;
-
-    -- Register output on clock edge
-    PROCESS(clk, reset)
-    BEGIN
-        IF reset = '1' THEN
-            data_out <= (OTHERS => '0');
-            flag_values <= "000";
-        ELSIF rising_edge(clk) THEN
-            data_out <= result;
-            flag_values <= neg_flag & zero_flag & carry_flag;
-        END IF;
-    END PROCESS;
+    -- ============================================
+    -- DIRECT COMBINATIONAL OUTPUTS (NO REGISTERS)
+    -- ============================================
+    data_out <= result;
+    flag_values <= neg_flag & zero_flag & carry_flag;
 
 END ARCHITECTURE;

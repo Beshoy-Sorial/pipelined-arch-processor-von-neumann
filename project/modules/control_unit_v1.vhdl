@@ -166,7 +166,7 @@ begin
                         reg_write_en <= '1';
 
                     when "100" =>  -- INC
-                        ALU_op <= "0011";
+                        ALU_op <= "1000";
                         reg_write_en <= '1';
 
                     when "101" =>  -- OUT
@@ -175,7 +175,7 @@ begin
                     when "110" =>  -- IN
                         in_port_en <= '1';
                         reg_write_en <= '1';
-                        MEM_ALU <= '1';
+                        -- MEM_ALU <= '1';
 
                     when others =>
                         null;
@@ -237,7 +237,8 @@ begin
                         R2_SEL <= '1';
                         alu_op <= "0101";
                         alu_immediate <= '1';
-                        mem_alu <= '1';
+                        reg_write_en <= '1';
+                        -- mem_alu <= '1';
                         flush_decode_decode <= '1';
 
 

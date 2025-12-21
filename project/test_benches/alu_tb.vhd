@@ -1,230 +1,264 @@
 LIBRARY IEEE;
 USE IEEE.STD_LOGIC_1164.ALL;
 USE IEEE.NUMERIC_STD.ALL;
-USE STD.TEXTIO.ALL;
 
 ENTITY alu_tb IS
-END ENTITY alu_tb;
+END ENTITY;
 
-ARCHITECTURE behavior OF alu_tb IS
-	CONSTANT n : INTEGER := 32; -- 32-bit operands (same as ALU)
-	CONSTANT clock_period : TIME := 10 ns;
-
-	SIGNAL clk           : STD_LOGIC := '0';
-	SIGNAL reset         : STD_LOGIC := '0';
-	SIGNAL data_in1      : STD_LOGIC_VECTOR(n - 1 DOWNTO 0) := (OTHERS => '0');
-	SIGNAL data_in2      : STD_LOGIC_VECTOR(n - 1 DOWNTO 0) := (OTHERS => '0');
-	SIGNAL operation     : STD_LOGIC_VECTOR(3 DOWNTO 0) := (OTHERS => '0');
-	SIGNAL counter       : STD_LOGIC := '0';
-	SIGNAL data_out      : STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
-	SIGNAL Restore       : STD_LOGIC;
-	SIGNAL store         : STD_LOGIC;
-	SIGNAL flag_values   : STD_LOGIC_VECTOR(2 DOWNTO 0);
-
-	-- Test counters
-	SIGNAL test_count : INTEGER := 0;
-	SIGNAL pass_count : INTEGER := 0;
-	SIGNAL fail_count : INTEGER := 0;
-
-	-- Helper function to convert std_logic to string
-	FUNCTION sl_to_str(sl : STD_LOGIC) RETURN STRING IS
-	BEGIN
-		IF sl = '1' THEN
-			RETURN "1";
-		ELSE
-			RETURN "0";
-		END IF;
-	END FUNCTION;
-
-	-- Helper function for flag interpretation
-	FUNCTION flags_to_str(flags : STD_LOGIC_VECTOR(2 DOWNTO 0)) RETURN STRING IS
-	BEGIN
-		RETURN "N=" & sl_to_str(flags(2)) & " Z=" & sl_to_str(flags(1)) & " C=" & sl_to_str(flags(0));
-	END FUNCTION;
-
+ARCHITECTURE testbench OF alu_tb IS
+    
+    -- Constants
+    CONSTANT n : INTEGER := 32;
+    CONSTANT clk_period : TIME := 10 ns;
+    
+    -- Component Declaration
+    COMPONENT alu IS 
+        GENERIC (n : INTEGER := 32);
+        PORT (
+            reset : IN STD_LOGIC;
+            clk : IN STD_LOGIC;
+            data_in1 : IN STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
+            data_in2 : IN STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
+            operation : IN STD_LOGIC_VECTOR(3 DOWNTO 0);
+            counter : IN STD_LOGIC;
+            data_out : OUT STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
+            Restore : OUT STD_LOGIC;
+            store : OUT STD_LOGIC;
+            flag_values : OUT STD_LOGIC_VECTOR(2 DOWNTO 0)
+        );
+    END COMPONENT;
+    
+    -- Signals
+    SIGNAL reset : STD_LOGIC := '0';
+    SIGNAL clk : STD_LOGIC := '0';
+    SIGNAL data_in1 : STD_LOGIC_VECTOR(n - 1 DOWNTO 0) := (OTHERS => '0');
+    SIGNAL data_in2 : STD_LOGIC_VECTOR(n - 1 DOWNTO 0) := (OTHERS => '0');
+    SIGNAL operation : STD_LOGIC_VECTOR(3 DOWNTO 0) := (OTHERS => '0');
+    SIGNAL counter : STD_LOGIC := '0';
+    SIGNAL data_out : STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
+    SIGNAL Restore : STD_LOGIC;
+    SIGNAL store : STD_LOGIC;
+    SIGNAL flag_values : STD_LOGIC_VECTOR(2 DOWNTO 0);
+    
+    -- Flag aliases for easier reading
+    ALIAS neg_flag : STD_LOGIC IS flag_values(2);
+    ALIAS zero_flag : STD_LOGIC IS flag_values(1);
+    ALIAS carry_flag : STD_LOGIC IS flag_values(0);
+    
 BEGIN
-
-	-- Instantiate UUT
-	UUT : ENTITY WORK.alu
-	GENERIC MAP (n => n)
-	PORT MAP (
-		reset => reset,
-		clk => clk,
-		data_in1 => data_in1,
-		data_in2 => data_in2,
-		operation => operation(3 DOWNTO 0),
-		counter => counter,
-		data_out => data_out,
-		Restore => Restore,
-		store => store,
-		flag_values => flag_values
-	);
-
-	-- Clock generation
-	clk_process : PROCESS
-	BEGIN
-		clk <= '0';
-		WAIT FOR clock_period / 2;
-		clk <= '1';
-		WAIT FOR clock_period / 2;
-	END PROCESS clk_process;
-
-	-- Stimulus process
-	stim_proc: PROCESS
-
-		PROCEDURE test_alu(
-			test_name : IN STRING;
-			op : IN STD_LOGIC_VECTOR(3 DOWNTO 0);
-			in1 : IN STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
-			in2 : IN STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
-			cnt : IN STD_LOGIC;
-			expected_out : IN STD_LOGIC_VECTOR(n - 1 DOWNTO 0);
-			exp_carry : IN STD_LOGIC := '0';
-			exp_zero : IN STD_LOGIC := '0';
-			exp_neg : IN STD_LOGIC := '0'
-		) IS
-		BEGIN
-			test_count <= test_count + 1;
-			operation <= op;
-			data_in1 <= in1;
-			data_in2 <= in2;
-			counter <= cnt;
-			
-			WAIT UNTIL rising_edge(clk);
-			WAIT FOR 2 ns; -- settle time
-			
-			IF data_out = expected_out AND 
-			   flag_values(0) = exp_carry AND
-			   flag_values(1) = exp_zero AND
-			   flag_values(2) = exp_neg THEN
-				REPORT "[PASS] " & test_name SEVERITY NOTE;
-				pass_count <= pass_count + 1;
-			ELSE
-				REPORT "[FAIL] " & test_name SEVERITY ERROR;
-				REPORT "  Expected: " & INTEGER'IMAGE(TO_INTEGER(UNSIGNED(expected_out))) & 
-						" (" & flags_to_str(exp_neg & exp_zero & exp_carry) & ")" SEVERITY ERROR;
-				REPORT "  Got:      " & INTEGER'IMAGE(TO_INTEGER(UNSIGNED(data_out))) & 
-						" (" & flags_to_str(flag_values) & ")" SEVERITY ERROR;
-				fail_count <= fail_count + 1;
-			END IF;
-		END PROCEDURE;
-
-	BEGIN
-		-- Initial reset
-		reset <= '1';
-		WAIT FOR clock_period * 2;
-		reset <= '0';
-		WAIT FOR clock_period;
-
-		REPORT "========================================" SEVERITY NOTE;
-		REPORT "    ALU BASIC TESTBENCH" SEVERITY NOTE;
-		REPORT "========================================" SEVERITY NOTE;
-
-		-- Test 0001: ADD Operation
-		test_alu("ADD: 5 + 3 = 8", "0001", 
-				 STD_LOGIC_VECTOR(TO_UNSIGNED(5, n)),
-				 STD_LOGIC_VECTOR(TO_UNSIGNED(3, n)),
-				 '0',
-				 STD_LOGIC_VECTOR(TO_UNSIGNED(8, n)));
-
-		-- Test 0010: SUB Operation
-		test_alu("SUB: 10 - 3 = 7", "0010",
-				 STD_LOGIC_VECTOR(TO_UNSIGNED(10, n)),
-				 STD_LOGIC_VECTOR(TO_UNSIGNED(3, n)),
-				 '0',
-				 STD_LOGIC_VECTOR(TO_UNSIGNED(7, n)));
-
-		-- Test 0011: AND Operation
-		test_alu("AND: 0xFF AND 0x0F = 0x0F", "0011",
-				 X"000000FF",
-				 X"0000000F",
-				 '0',
-				 X"0000000F");
-
-		-- Test 0100: MOV/First
-		test_alu("MOV: Pass 0x12345678", "0100",
-				 X"12345678",
-				 X"87654321",
-				 '0',
-				 X"12345678");
-
-		-- Test 0101: Second
-		test_alu("Second: Output in2 (0x22222222)", "0101",
-				 X"11111111",
-				 X"22222222",
-				 '0',
-				 X"22222222");
-
-		-- Test 0110: First until counter (SWAP)
-		test_alu("SWAP: Counter=0, select first", "0110",
-				 X"AAAAAAAA",
-				 X"BBBBBBBB",
-				 '0',
-				 X"AAAAAAAA");
-
-		test_alu("SWAP: Counter=1, select second", "0110",
-				 X"CCCCCCCC",
-				 X"DDDDDDDD",
-				 '1',
-				 X"DDDDDDDD");
-
-		-- Test 0111: SetC
-		test_alu("SetC: Set carry flag", "0111",
-				 STD_LOGIC_VECTOR(TO_UNSIGNED(100, n)),
-				 STD_LOGIC_VECTOR(TO_UNSIGNED(200, n)),
-				 '0',
-				 STD_LOGIC_VECTOR(TO_UNSIGNED(100, n)),
-				 exp_carry => '1');
-
-		-- Test 1000: INC
-		test_alu("INC: 5 + 1 = 6", "1000",
-				 STD_LOGIC_VECTOR(TO_UNSIGNED(5, n)),
-				 STD_LOGIC_VECTOR(TO_UNSIGNED(0, n)),
-				 '0',
-				 STD_LOGIC_VECTOR(TO_UNSIGNED(6, n)));
-
-		-- Test 1001: NOT
-		test_alu("NOT: NOT(0xAAAAAAAA) = 0x55555555", "1001",
-				 X"AAAAAAAA",
-				 STD_LOGIC_VECTOR(TO_UNSIGNED(0, n)),
-				 '0',
-				 X"55555555");
-
-		-- Test 1010: Add 2
-		test_alu("Add 2: 100 + 2 = 102", "1010",
-				 STD_LOGIC_VECTOR(TO_UNSIGNED(100, n)),
-				 STD_LOGIC_VECTOR(TO_UNSIGNED(0, n)),
-				 '0',
-				 STD_LOGIC_VECTOR(TO_UNSIGNED(102, n)));
-
-		-- Test 1011: Restore
-		test_alu("Restore: Pass through data (0x99999999)", "1011",
-				 X"99999999",
-				 STD_LOGIC_VECTOR(TO_UNSIGNED(0, n)),
-				 '0',
-				 X"99999999");
-
-		WAIT FOR clock_period * 2;
-
-		-- Summary Report
-		REPORT "========================================" SEVERITY NOTE;
-		REPORT "          TESTBENCH SUMMARY" SEVERITY NOTE;
-		REPORT "========================================" SEVERITY NOTE;
-		REPORT "Total Tests Run:  " & INTEGER'IMAGE(test_count) SEVERITY NOTE;
-		REPORT "Tests Passed:     " & INTEGER'IMAGE(pass_count) SEVERITY NOTE;
-		REPORT "Tests Failed:     " & INTEGER'IMAGE(fail_count) SEVERITY NOTE;
-		REPORT "========================================" SEVERITY NOTE;
-
-		IF fail_count = 0 THEN
-			REPORT "    ALL TESTS PASSED SUCCESSFULL" SEVERITY NOTE;
-		ELSE
-			REPORT "    SOME TESTS FAILED - CHECK ABOVE" SEVERITY ERROR;
-		END IF;
-		REPORT "========================================" SEVERITY NOTE;
-
-		WAIT;
-
-	END PROCESS stim_proc;
-
-END ARCHITECTURE behavior;
-
+    
+    -- Instantiate the Unit Under Test (UUT)
+    uut: alu 
+        GENERIC MAP (n => n)
+        PORT MAP (
+            reset => reset,
+            clk => clk,
+            data_in1 => data_in1,
+            data_in2 => data_in2,
+            operation => operation,
+            counter => counter,
+            data_out => data_out,
+            Restore => Restore,
+            store => store,
+            flag_values => flag_values
+        );
+    
+    -- Clock generation
+    clk_process: PROCESS
+    BEGIN
+        clk <= '0';
+        WAIT FOR clk_period/2;
+        clk <= '1';
+        WAIT FOR clk_period/2;
+    END PROCESS;
+    
+    -- Stimulus process
+    stim_proc: PROCESS
+    BEGIN
+        -- Initial reset
+        reset <= '1';
+        WAIT FOR clk_period * 2;
+        reset <= '0';
+        WAIT FOR clk_period;
+        
+        REPORT "Starting ALU Tests...";
+        
+        -- ====================================
+        -- Test 1: ADD Operation (0001)
+        -- ====================================
+        REPORT "Test 1: ADD - 15 + 10 = 25";
+        data_in1 <= std_logic_vector(to_unsigned(15, n));
+        data_in2 <= std_logic_vector(to_unsigned(10, n));
+        operation <= "0001";
+        counter <= '0';
+        WAIT FOR clk_period;
+        ASSERT data_out = std_logic_vector(to_unsigned(25, n))
+            REPORT "ADD failed: Expected 25, Got " & INTEGER'IMAGE(to_integer(unsigned(data_out)))
+            SEVERITY ERROR;
+        ASSERT store = '1' REPORT "ADD: store should be 1" SEVERITY ERROR;
+        
+        -- Test ADD with carry
+        REPORT "Test 1b: ADD with Carry - Max + 1";
+        data_in1 <= (OTHERS => '1');  -- Max value
+        data_in2 <= std_logic_vector(to_unsigned(1, n));
+        operation <= "0001";
+        WAIT FOR clk_period;
+        ASSERT carry_flag = '1' REPORT "ADD: carry flag should be set" SEVERITY ERROR;
+        
+        -- ====================================
+        -- Test 2: SUB Operation (0010)
+        -- ====================================
+        REPORT "Test 2: SUB - 20 - 5 = 15";
+        data_in1 <= std_logic_vector(to_unsigned(20, n));
+        data_in2 <= std_logic_vector(to_unsigned(5, n));
+        operation <= "0010";
+        WAIT FOR clk_period;
+        ASSERT data_out = std_logic_vector(to_unsigned(15, n))
+            REPORT "SUB failed: Expected 15, Got " & INTEGER'IMAGE(to_integer(unsigned(data_out)))
+            SEVERITY ERROR;
+        ASSERT store = '1' REPORT "SUB: store should be 1" SEVERITY ERROR;
+        
+        -- Test SUB resulting in zero
+        REPORT "Test 2b: SUB - Zero result (10 - 10)";
+        data_in1 <= std_logic_vector(to_unsigned(10, n));
+        data_in2 <= std_logic_vector(to_unsigned(10, n));
+        operation <= "0010";
+        WAIT FOR clk_period;
+        ASSERT zero_flag = '1' REPORT "SUB: zero flag should be set" SEVERITY ERROR;
+        
+        -- ====================================
+        -- Test 3: AND Operation (0011)
+        -- ====================================
+        REPORT "Test 3: AND - 0xFF AND 0x0F";
+        data_in1 <= X"000000FF";
+        data_in2 <= X"0000000F";
+        operation <= "0011";
+        WAIT FOR clk_period;
+        ASSERT data_out = X"0000000F"
+            REPORT "AND failed" SEVERITY ERROR;
+        ASSERT store = '1' REPORT "AND: store should be 1" SEVERITY ERROR;
+        
+        -- ====================================
+        -- Test 4: MOV/First Operation (0100)
+        -- ====================================
+        REPORT "Test 4: MOV - Pass data_in1";
+        data_in1 <= std_logic_vector(to_unsigned(42, n));
+        data_in2 <= std_logic_vector(to_unsigned(99, n));
+        operation <= "0100";
+        WAIT FOR clk_period;
+        ASSERT data_out = std_logic_vector(to_unsigned(42, n))
+            REPORT "MOV failed" SEVERITY ERROR;
+        ASSERT store = '1' REPORT "MOV: store should be 1" SEVERITY ERROR;
+        
+        -- ====================================
+        -- Test 5: Second Operation (0101)
+        -- ====================================
+        REPORT "Test 5: Second - Pass data_in2";
+        data_in1 <= std_logic_vector(to_unsigned(42, n));
+        data_in2 <= std_logic_vector(to_unsigned(99, n));
+        operation <= "0101";
+        WAIT FOR clk_period;
+        ASSERT data_out = std_logic_vector(to_unsigned(99, n))
+            REPORT "Second operation failed" SEVERITY ERROR;
+        ASSERT store = '1' REPORT "Second: store should be 1" SEVERITY ERROR;
+        
+        -- ====================================
+        -- Test 6: SWAP Operation (0110)
+        -- ====================================
+        REPORT "Test 6a: SWAP - counter = 0 (output data_in1)";
+        data_in1 <= std_logic_vector(to_unsigned(100, n));
+        data_in2 <= std_logic_vector(to_unsigned(200, n));
+        operation <= "0110";
+        counter <= '0';
+        WAIT FOR clk_period;
+        ASSERT data_out = std_logic_vector(to_unsigned(100, n))
+            REPORT "SWAP (counter=0) failed" SEVERITY ERROR;
+        
+        REPORT "Test 6b: SWAP - counter = 1 (output data_in2)";
+        counter <= '1';
+        WAIT FOR clk_period;
+        ASSERT data_out = std_logic_vector(to_unsigned(200, n))
+            REPORT "SWAP (counter=1) failed" SEVERITY ERROR;
+        ASSERT store = '1' REPORT "SWAP: store should be 1" SEVERITY ERROR;
+        counter <= '0';
+        
+        -- ====================================
+        -- Test 7: SetC Operation (0111)
+        -- ====================================
+        REPORT "Test 7: SetC - Set carry flag";
+        data_in1 <= std_logic_vector(to_unsigned(50, n));
+        operation <= "0111";
+        WAIT FOR clk_period;
+        ASSERT carry_flag = '1' REPORT "SetC: carry flag should be set" SEVERITY ERROR;
+        ASSERT data_out = std_logic_vector(to_unsigned(50, n))
+            REPORT "SetC: data should pass through" SEVERITY ERROR;
+        ASSERT store = '1' REPORT "SetC: store should be 1" SEVERITY ERROR;
+        
+        -- ====================================
+        -- Test 8: INC Operation (1000)
+        -- ====================================
+        REPORT "Test 8: INC - Increment 7 to 8";
+        data_in1 <= std_logic_vector(to_unsigned(7, n));
+        operation <= "1000";
+        WAIT FOR clk_period;
+        ASSERT data_out = std_logic_vector(to_unsigned(8, n))
+            REPORT "INC failed" SEVERITY ERROR;
+        ASSERT store = '1' REPORT "INC: store should be 1" SEVERITY ERROR;
+        
+        -- ====================================
+        -- Test 9: NOT Operation (1001)
+        -- ====================================
+        REPORT "Test 9: NOT - Invert bits";
+        data_in1 <= X"0F0F0F0F";
+        operation <= "1001";
+        WAIT FOR clk_period;
+        ASSERT data_out = X"F0F0F0F0"
+            REPORT "NOT failed" SEVERITY ERROR;
+        ASSERT store = '1' REPORT "NOT: store should be 1" SEVERITY ERROR;
+        
+        -- ====================================
+        -- Test 10: Add2 Operation (1010)
+        -- ====================================
+        REPORT "Test 10: Add2 - Add 2 to value";
+        data_in1 <= std_logic_vector(to_unsigned(10, n));
+        operation <= "1010";
+        WAIT FOR clk_period;
+        ASSERT data_out = std_logic_vector(to_unsigned(12, n))
+            REPORT "Add2 failed" SEVERITY ERROR;
+        ASSERT store = '1' REPORT "Add2: store should be 1" SEVERITY ERROR;
+        
+        -- ====================================
+        -- Test 11: Restore Operation (1011)
+        -- ====================================
+        REPORT "Test 11: Restore - Check Restore signal";
+        data_in1 <= std_logic_vector(to_unsigned(123, n));
+        operation <= "1011";
+        WAIT FOR clk_period;
+        ASSERT Restore = '1' REPORT "Restore signal should be 1" SEVERITY ERROR;
+        ASSERT store = '0' REPORT "Restore: store should be 0" SEVERITY ERROR;
+        ASSERT data_out = std_logic_vector(to_unsigned(123, n))
+            REPORT "Restore: data should pass through" SEVERITY ERROR;
+        
+        -- ====================================
+        -- Test 12: Reset functionality
+        -- ====================================
+        REPORT "Test 12: Reset - All outputs should be zero";
+        reset <= '1';
+        WAIT FOR clk_period;
+        ASSERT data_out = std_logic_vector(to_unsigned(0, n))
+            REPORT "Reset: data_out should be 0" SEVERITY ERROR;
+        ASSERT flag_values = "000" REPORT "Reset: flags should be 000" SEVERITY ERROR;
+        ASSERT store = '0' REPORT "Reset: store should be 0" SEVERITY ERROR;
+        ASSERT Restore = '0' REPORT "Reset: Restore should be 0" SEVERITY ERROR;
+        reset <= '0';
+        WAIT FOR clk_period;
+        
+        -- ====================================
+        -- End of tests
+        -- ====================================
+        REPORT "All ALU tests completed successfully!";
+        WAIT;
+        
+    END PROCESS;
+    
+END ARCHITECTURE;

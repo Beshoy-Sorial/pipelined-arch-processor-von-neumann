@@ -20,25 +20,25 @@ ARCHITECTURE mem_behave OF memory IS
         CONSTANT DATA_WIDTH : INTEGER := 31;
         TYPE mem_array IS ARRAY(0 to (2 ** ADDR_WIDTH) - 1) OF STD_LOGIC_VECTOR(DATA_WIDTH DOWNTO 0);
         
-        -- Function to initialize memory from file
         IMPURE FUNCTION init_memory_from_file(file_name : STRING) RETURN mem_array IS
             FILE init_file : TEXT OPEN READ_MODE IS file_name;
             VARIABLE line_buf : LINE;
             VARIABLE temp_mem : mem_array := (OTHERS => (OTHERS => '0'));
             VARIABLE addr : INTEGER := 0;
-            VARIABLE data_val : STD_LOGIC_VECTOR(31 DOWNTO 0);
+            -- VARIABLE data_val : STD_LOGIC_VECTOR(31 DOWNTO 0);
+            VARIABLE temp_bit_vec : BIT_VECTOR(31 DOWNTO 0); --
         BEGIN
             WHILE NOT ENDFILE(init_file) AND addr < 2**ADDR_WIDTH LOOP
                 READLINE(init_file, line_buf);
-                HREAD(line_buf, data_val);  -- Read hex value
-                temp_mem(addr) := data_val;
+                READ(line_buf, temp_bit_vec);  -- 
+                temp_mem(addr) := To_StdLogicVector(temp_bit_vec);
                 addr := addr + 1;
             END LOOP;
             FILE_CLOSE(init_file);
             RETURN temp_mem;
         END FUNCTION;
         
-        SIGNAL main_memory : mem_array := init_memory_from_file("./memory.txt");
+        SIGNAL main_memory : mem_array := init_memory_from_file("memory.txt");
         
 BEGIN
         memo_main : PROCESS (clk, reset)
