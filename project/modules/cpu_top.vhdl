@@ -315,6 +315,7 @@ BEGIN
         in_port_en => in_port_en_cu,
         reg_write_en => reg_write_en_cu,
         MEM_ALU => MEM_ALU_cu,
+        swap_sel => swap_sel_cu,
         ALU_immediate => ALU_immediate_cu,
         R2_sel => R2_sel_cu,
         exe_counter_en => exe_counter_en_cu,
@@ -528,7 +529,7 @@ ELSE
 
     -- regfile --  
     R1_reg_file_in <= fetchDecode_pipe_output(18 DOWNTO 16);
-    R2_reg_file_in <= fetchDecode_pipe_output(21 DOWNTO 19);
+    R2_reg_file_in <= fetchDecode_pipe_output(15 DOWNTO 13);
     WB_address_reg_file_in <= memWB_pipe_output(130 DOWNTO 128);
     reg_file_write_enable <= memWB_pipe_output(144);
 
@@ -553,11 +554,12 @@ ELSE
         ELSE
         decodeExecute_pipe_output(63 DOWNTO 32);
 
-    alu_data_in2 <= r2_or_imm WHEN forward_b = "00"
-        ELSE
-        memWB_pipe_output(31 DOWNTO 0) WHEN forward_b = "01"
-        ELSE
-        WB_data_reg_file_in;
+    alu_data_in2 <= r2_or_imm;
+    --  WHEN forward_b = "00"
+    --     ELSE
+    --     memWB_pipe_output(31 DOWNTO 0) WHEN forward_b = "01"
+    --     ELSE
+    --     WB_data_reg_file_in;
 
     -- R1_reg_file_in <= decodeExecute_pipe_output(125 downto 123);
     -- R2_reg_file_in <= decodeExecute_pipe_output(128 downto 126);
@@ -565,11 +567,12 @@ ELSE
         ELSE
         (31 DOWNTO 1 => '0') & decodeExecute_pipe_output(146);
 
-    alu_data_in1 <= r1_or_index WHEN forward_a = "00"
-        ELSE
-        memWB_pipe_output(31 DOWNTO 0) WHEN forward_a = "01"
-        ELSE
-        WB_data_reg_file_in;
+    alu_data_in1 <= r1_or_index;
+    --  WHEN forward_a = "00"
+    --     ELSE
+    --     memWB_pipe_output(31 DOWNTO 0) WHEN forward_a = "01"
+    --     ELSE
+    --     WB_data_reg_file_in;
 
     r1_or_r2 <= decodeExecute_pipe_output(131 DOWNTO 129) WHEN exe_counter_out = '1'
         ELSE

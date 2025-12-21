@@ -7,10 +7,30 @@ quietly set PERIOD 100ns
 # Force clock to start at 0
 force -freeze clk 0 0, 1 {50ns} -r 100ns
 
+# ========================================
+# ADD WAVES FIRST - Before Forcing
+# ========================================
+
+# Add Register File Contents
+add wave -divider "REGISTER FILE CONTENTS"
+add wave -radix hexadecimal sim:/cpu_top/RegFile/register_file(0)
+add wave -radix hexadecimal sim:/cpu_top/RegFile/register_file(1)
+add wave -radix hexadecimal sim:/cpu_top/RegFile/register_file(2)
+add wave -radix hexadecimal sim:/cpu_top/RegFile/register_file(3)
+add wave -radix hexadecimal sim:/cpu_top/RegFile/register_file(4)
+add wave -radix hexadecimal sim:/cpu_top/RegFile/register_file(5)
+add wave -radix hexadecimal sim:/cpu_top/RegFile/register_file(6)
+add wave -radix hexadecimal sim:/cpu_top/RegFile/register_file(7)
+add wave -radix hexadecimal sim:/cpu_top/MYAlu/*
+add wave -radix hexadecimal sim:/cpu_top/controlUnit/reg_write_en
+# Add all signals to wave window
+add wave -position insertpoint sim:/cpu_top/*
+
 # ========== FORCE INPUT SIGNALS ==========
 force -freeze reset 1
 force -freeze int 0
-force -freeze in_port 32'h00000000
+# Force in_port to stay at 0x0000000E (will NOT be released later)
+force -freeze in_port 32'h0000000E
 
 # ========== FORCE INTERNAL SIGNALS ==========
 
@@ -123,15 +143,24 @@ force -freeze /cpu_top/r1_r2_or_rdest 3'b000
 run 200ns
 
 echo "=========================================="
+echo "Releasing reset and setting it to 0"
+echo "=========================================="
+
+# Release reset and set it to 0 (inactive)
+force -freeze reset 0
+run 100ns
+
+echo "=========================================="
 echo "Releasing all forced signals after 2 clock cycles"
 echo "=========================================="
 
 # ========== RELEASE ALL FORCES ==========
 
-# Release input signals
+# Release input signals - EXCEPT in_port which stays at 0x0000000E
 noforce reset
 noforce int
-noforce in_port
+# Keep in_port forced to 0x0000000E
+# noforce in_port
 
 # Release PC and SP signals
 noforce /cpu_top/enable_pc
@@ -238,14 +267,23 @@ noforce /cpu_top/r1_or_index
 noforce /cpu_top/r1_or_r2
 noforce /cpu_top/r1_r2_or_rdest
 
-# Add all signals to wave window
-add wave -position insertpoint sim:/cpu_top/*
-
 echo "=========================================="
 echo "Initialization complete - All signals released"
+echo "in_port remains at 0x0000000E (14 decimal)"
 echo "Clock continues running"
 echo "Ready for testing"
 echo "=========================================="
 
-# Optional: Run for additional time to observe behavior
-# run 1us
+# Re-force in_port to ensure it stays at the correct value
+force -freeze in_port 32'h0000000E
+
+# Run for many more cycles to observe CPU behavior
+run 3us
+
+echo "=========================================="
+echo "Simulation complete - 30 cycles executed"
+echo "=========================================="
+
+# Save the waveform
+# Uncomment the following line if you want to automatically save the waveform
+# write wave wave.do

@@ -208,7 +208,7 @@ class Assembler:
 
 def main():
     asm = Assembler(mem_size=1024) #1048576
-    asm.assemble("OneOperand.asm")
+    asm.assemble("TwoOperand.asm")
     asm.write_txt("memory.txt")
     asm.write_mif("memory.mif")
 

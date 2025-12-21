@@ -186,21 +186,23 @@ begin
             ------------------------------------------------------------------
             when "01" =>
                 reg_write_en <= '1';
-                MEM_ALU <= '1';
+                
 
                 case instr_id is
-                    when "000" => ALU_op <= "0001"; -- ADD
-                    when "001" => ALU_op <= "0010"; -- SUB
-                    when "010" => ALU_op <= "0011"; -- AND
-                    when "011" => ALU_op <= "0100"; -- MOV
+                    when "010" => ALU_op <= "0001"; -- ADD
+                    when "011" => 
+                    ALU_op <= "0010"; -- SUB
+                
+                    when "100" => ALU_op <= "0011"; -- AND
+                    when "000" => ALU_op <= "0100"; -- MOV
 
-                    when "100" =>      --IADD
+                    when "101" =>      --IADD
                     ALU_op <= "0001";
                     R2_sel <= '1';
                     flush_decode_decode <= '1';
 
                      --
-                    when "101" => --swap
+                    when "001" => --swap        
                         ALU_op <= "0110";
                         exe_counter_en <= '1';
                         stop_pc <= '1';
